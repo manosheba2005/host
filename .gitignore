@@ -1,0 +1,15 @@
+node_modules
+.next
+.env*
+!.env.example
+wasla.sqlite*
+*.tsbuildinfo
+
+# Local data, archives, and generated files
+*.sqlite*
+*.zip
+*.log
+.DS_Store
+.vercel
+coverage
+data/
