@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { adminEmail, db, getLinks, isActive, monthlyPrice, passwordHash, passwordMatches, safeUser, scheduled, validDate, audit, isPaid, slugify, validUrl, vodafoneCashNumber } from "@/lib/db";
+import { adminEmail, db, ensureOwner, getLinks, isActive, monthlyPrice, passwordHash, passwordMatches, safeUser, scheduled, validDate, audit, isPaid, slugify, validUrl, vodafoneCashNumber } from "@/lib/db";
 export const runtime = "nodejs";
 const SESSION = "wasla_session";
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
@@ -9,6 +9,7 @@ const attempts = new Map<string,{n:number;t:number}>();
 async function body(req: NextRequest) { return req.json().catch(() => ({})); }
 function parts(req: NextRequest) { return new URL(req.url).pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean); }
 async function current() {
+  ensureOwner();
   const jar = await cookies(), token = jar.get(SESSION)?.value;
   if (!token) return null;
   const session = db.prepare("SELECT user_id,expires FROM sessions WHERE token=?").get(token) as any;
@@ -110,6 +111,7 @@ export async function POST(req: NextRequest) {
       const res = NextResponse.json({ ok: true }); res.cookies.delete(SESSION); return res;
     }
     if (p[0] === "auth" && p[1] === "register") {
+      ensureOwner();
       if (!d.name || !d.email || String(d.password || "").length < 10) return fail("أدخل الاسم والبريد وكلمة مرور من 10 أحرف على الأقل.");
       const email = String(d.email).trim().toLowerCase();
       if (email === adminEmail || db.prepare("SELECT id FROM users WHERE email=?").get(email)) return fail("البريد مستخدم بالفعل.", 409);
@@ -122,6 +124,7 @@ export async function POST(req: NextRequest) {
       return sessionResponse(user, token, 201);
     }
     if (p[0] === "auth" && p[1] === "login") {
+      ensureOwner();
       const key = (req.headers.get("x-forwarded-for") || "local") + "|" + String(d.email || "").toLowerCase(), now = Date.now(), a0 = attempts.get(key);
       if (a0 && now - a0.t < 15 * 60000 && a0.n >= 8) return fail("محاولات كثيرة. حاول بعد ١٥ دقيقة.", 429);
       const user = db.prepare("SELECT * FROM users WHERE email=?").get(String(d.email || "").trim().toLowerCase()) as any;
